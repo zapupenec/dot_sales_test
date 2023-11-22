@@ -9,9 +9,6 @@ import {
 import { AppService } from './app.service';
 import { AppDto } from './dto/app.dto';
 
-// https://35d3-188-243-183-246.ngrok-free.app
-// https://www.amocrm.ru/oauth?client_id=d2ef3bf6-86c0-4777-a914-6bc6899f0df2&mode=post_message
-
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}

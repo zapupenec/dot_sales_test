@@ -81,7 +81,7 @@ export class AppService {
     const contactByEmail = await fetchContactBy('email', email);
     const contactByPhone = await fetchContactBy('phone', phone);
 
-    return contactByEmail ?? contactByPhone;
+    return contactByEmail || contactByPhone;
   }
 
   async createContact(params: AppDto) {
