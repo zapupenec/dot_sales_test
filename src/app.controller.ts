@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Logger,
   Query,
   Redirect,
   ValidationPipe,
@@ -12,7 +11,6 @@ import { AppDto } from './dto/app.dto';
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
-  private readonly logger = new Logger(AppController.name);
 
   @Get('/')
   @Redirect(
@@ -21,13 +19,13 @@ export class AppController {
   )
   redirect() {}
 
-  @Get('oauth')
+  @Get('/oauth')
   async getAuth(@Query() params) {
-    await this.appService.requestTokenData(params);
+    await this.appService.requestTokenData('access', params.code);
   }
 
   @Get('/leads')
-  async exampleMethod(@Query(new ValidationPipe()) params: AppDto) {
+  async createLead(@Query(new ValidationPipe()) params: AppDto) {
     const contact = await this.appService.fetchContact(params);
     let id;
     if (contact) {

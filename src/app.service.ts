@@ -1,17 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AppDto } from './dto/app.dto';
 
 @Injectable()
 export class AppService {
   constructor(private readonly httpService: HttpService) {}
-  private readonly logger = new Logger(AppService.name);
+
   tokenData: {
     token_type: string;
-    expires_in: number | null;
+    expires_in: number;
     access_token: string;
     refresh_token: string;
-    expiration_time: number | null;
+    expiration_time: number;
   } | null = null;
 
   getAuthHeader() {
@@ -20,17 +20,45 @@ export class AppService {
     };
   }
 
-  async requestTokenData(params) {
-    const { code } = params;
-    const url = 'https://ramvitalik.amocrm.ru/oauth2/access_token';
-    const requestData = {
+  isExpiredToken() {
+    if (!this.tokenData) {
+      return false;
+    }
+    return this.tokenData.expiration_time < Math.floor(Date.now() / 1000);
+  }
+
+  getDataForRequestToken(typeToken: 'access' | 'refresh', code?: string) {
+    if (typeToken === 'access') {
+      return {
+        client_id: process.env.AMOCRM_ID,
+        client_secret: process.env.AMOCRM_SECRET,
+        redirect_uri: `${process.env.SERVER_URL}/oauth`,
+        grant_type: 'authorization_code',
+        code: code,
+      };
+    }
+
+    return {
       client_id: process.env.AMOCRM_ID,
       client_secret: process.env.AMOCRM_SECRET,
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: 'https://35d3-188-243-183-246.ngrok-free.app/oauth',
+      redirect_uri: `${process.env.SERVER_URL}/oauth`,
+      grant_type: 'refresh_token',
+      refresh_token: this.tokenData.refresh_token,
     };
-    const { data } = await this.httpService.post(url, requestData).toPromise();
+  }
+
+  async requestTokenData(typeToken: 'access' | 'refresh', code?: string) {
+    const url = `${process.env.AMOCRM_URL}/oauth2/access_token`;
+
+    const dataForRequest =
+      typeToken === 'access'
+        ? this.getDataForRequestToken('access', code)
+        : this.getDataForRequestToken('refresh');
+
+    const { data } = await this.httpService
+      .post(url, dataForRequest)
+      .toPromise();
+
     this.tokenData = {
       ...data,
       expiration_time: Math.floor(Date.now() / 1000) + data.expires_in,
@@ -38,14 +66,19 @@ export class AppService {
   }
 
   async fetchContact(params: AppDto) {
+    if (this.isExpiredToken()) {
+      this.requestTokenData('refresh');
+    }
+
     const { email, phone } = params;
 
     const fetchContactBy = async (field: 'email' | 'phone', query: string) => {
-      const url = `https://ramvitalik.amocrm.ru/api/v4/contacts?query=${query}`;
+      const url = `${process.env.AMOCRM_URL}/api/v4/contacts?query=${query}`;
 
       const { data } = await this.httpService
         .get(url, { headers: this.getAuthHeader() })
         .toPromise();
+
       if (!data) {
         return null;
       }
@@ -85,8 +118,12 @@ export class AppService {
   }
 
   async createContact(params: AppDto) {
+    if (this.isExpiredToken()) {
+      this.requestTokenData('refresh');
+    }
+
     const { name, email, phone } = params;
-    const url = 'https://ramvitalik.amocrm.ru/api/v4/contacts';
+    const url = `${process.env.AMOCRM_URL}/api/v4/contacts`;
 
     const newContact = {
       name,
@@ -118,8 +155,12 @@ export class AppService {
   }
 
   async updateContact(params: AppDto, id: number) {
+    if (this.isExpiredToken()) {
+      this.requestTokenData('refresh');
+    }
+
     const { name, email, phone } = params;
-    const url = `https://ramvitalik.amocrm.ru/api/v4/contacts`;
+    const url = `${process.env.AMOCRM_URL}/api/v4/contacts`;
 
     const newContact = {
       id,
@@ -152,7 +193,11 @@ export class AppService {
   }
 
   async createLead(id: number) {
-    const url = `https://ramvitalik.amocrm.ru/api/v4/leads`;
+    if (this.isExpiredToken()) {
+      this.requestTokenData('refresh');
+    }
+
+    const url = `${process.env.AMOCRM_URL}/api/v4/leads`;
 
     const newLead = {
       _embedded: {
